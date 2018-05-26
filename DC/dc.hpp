@@ -27,14 +27,14 @@ namespace DC
     }
   };
   
-  struct FileInfo
+  struct SFTInfo
   {
-    explicit FileInfo() {};
-    FileInfo(std::ifstream& s);
+    explicit SFTInfo() {};
+    SFTInfo(std::ifstream& s);
     void Export(std::string const& root, std::ifstream& s, bool pck = false) const;
     static bool ExportPCK(const unsigned char *in, int inlen, std::string const& dest);
     static bool ExportPCK(std::basic_istream<char>& s, std::string const& dest);
-    
+    static bool ReadSFT(std::vector<SFTInfo>& contents, std::ifstream& s);
     static uint32_t InfoSize()
     {
       return 252;
@@ -47,8 +47,9 @@ namespace DC
   };
   
   int PackPCK(std::string const& source, std::string const& destination);
-  int PackSFT(std::string const& source, std::string const& destination);
   
   int UnpackPCK(std::string const& src, std::string const& destination);
   int UnpackSFT(std::string const& src, std::string const& destination, bool unpackPck);
+  
+  int PatchSFT(std::string const& source, std::string const& sft, std::string const& name);
 }

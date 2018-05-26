@@ -22,26 +22,17 @@ using namespace std;
 const string CMD_UNPACK = "unpack";
 const string CMD_UNPACK_FULL = "unpackfull";
 const string CMD_PACK = "pack";
-const string CMD_PACK_PCK = "packpck";
+const string CMD_PATCH = "patch";
 
 
 void PrintInfo()
 {
   cout << "Usage:" << endl;
-  cout << "dc unpack source.sft [destination_dir - optional] - unpack sft" << endl;
   cout << "dc unpack source.pck [destination_dir - optional] - unpack pck" << endl;
+  cout << "dc unpack source.sft [destination_dir - optional] - unpack sft" << endl;
   cout << "dc unpackfull source.sft [destination_dir - optional] - unpack sft and all containing pck" << endl;
-  cout << "dc pack source_dir [destination.sft - optional] - pack folder to sft" << endl;
-  cout << "dc packpck source_dir [destination.pck - optional] - pack folder to pck" << endl;
-}
-
-int Pack(string const& source, string const& destination)
-{
-  if (Utils::EndsWith(destination, ".pck"))
-  {
-    return DC::PackPCK(source, destination);
-  }
-  return DC::PackSFT(source, destination);
+  cout << "dc pack source_dir [destination.pck - optional] - pack folder to pck" << endl;
+  cout << "dc patch target.sft source [name - optional] - replace sft's file called 'name' with the provided 'source' file" << endl;
 }
 
 int Unpack(string const& src, string const& destination, bool unpackPck)
@@ -55,48 +46,32 @@ int Unpack(string const& src, string const& destination, bool unpackPck)
 
 int main(int argc, const char * argv[])
 {
-  if (argc == 1)
+  if (argc < 3)
   {
     PrintInfo();
     return EXIT_FAILURE;
   }
+  
   YappyFillTables();
   
   if (argv[1] == CMD_UNPACK || argv[1] == CMD_UNPACK_FULL)
   {
-    if (argc < 3)
-    {
-      PrintInfo();
-      return EXIT_FAILURE;
-    }
-    const string dest = argc >= 4 ? argv[3] : (Utils::ParentPath(argv[2]) + Utils::SEPARATOR + Utils::FileName(argv[2]));
+    string dest = argc >= 4 ? argv[3] : (Utils::ParentPath(argv[2]) + Utils::SEPARATOR + Utils::FileName(argv[2]));
     return Unpack(argv[2], dest, (argv[1] == CMD_UNPACK_FULL));
   }
   else if (argv[1] == CMD_PACK)
   {
-    if (argc < 3)
-    {
-      PrintInfo();
-      return EXIT_FAILURE;
-    }
-    
-    const string dest = argc >= 4 ? argv[3] : (argv[2] + std::string(".sft"));
-    return Pack(argv[2], dest);
-  }
-  else if (argv[1] == CMD_PACK_PCK)
-  {
-    if (argc < 3)
-    {
-      PrintInfo();
-      return EXIT_FAILURE;
-    }
-    
     string dest = argc >= 4 ? argv[3] : (argv[2] + std::string(".pck"));
     if (!Utils::EndsWith(dest, ".pck"))
     {
       dest += dest.back() == '.' ? "pck" : ".pck";
     }
-    return Pack(argv[2], dest);
+    return DC::PackPCK(argv[2], dest);
+  }
+  else if (argv[1] == CMD_PATCH)
+  {
+    string name = argc >= 5 ? argv[4] : "";
+    DC::PatchSFT(argv[2], argv[3], name);
   }
   else
   {

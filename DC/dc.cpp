@@ -100,7 +100,7 @@ namespace DC
     s.write((char*)&Alignment, sizeof(Alignment));
   }
   
-  FileInfo::FileInfo(std::ifstream& s)
+  SFTInfo::SFTInfo(std::ifstream& s)
   {
     Name = Utils::ReadString(s, MAX_NAME_LENGTH);
     size_t pos = s.tellg();
@@ -111,7 +111,26 @@ namespace DC
     s.read((char*)&BlockSize, sizeof(int));
   }
   
-  bool FileInfo::ExportPCK(std::basic_istream<char>& s, std::string const& dest)
+  bool SFTInfo::ReadSFT(std::vector<SFTInfo>& contents, std::ifstream& s)
+  {
+    s.seekg(0, std::ios::beg);
+    unsigned int count = 0;
+    s.read((char*)&count, sizeof(count));
+    for (unsigned int i = 0; i < count; ++i)
+    {
+      DC::SFTInfo info(s);
+      if (!s.good())
+      {
+        std::cout << "Stream error!" << std::endl;
+        return false;
+      }
+      contents.push_back(info);
+    }
+    std::cout << "Loaded " << contents.size() << " elements" << std::endl;
+    return true;
+  }
+  
+  bool SFTInfo::ExportPCK(std::basic_istream<char>& s, std::string const& dest)
   {
     int magic = 0;
     s.read((char*)&magic, sizeof(magic));
@@ -162,13 +181,13 @@ namespace DC
     return true;
   }
   
-  bool FileInfo::ExportPCK(const unsigned char *in, int inlen, std::string const& dest)
+  bool SFTInfo::ExportPCK(const unsigned char *in, int inlen, std::string const& dest)
   {
     boost::interprocess::bufferstream s((char*)in, inlen);
     return ExportPCK(s, dest);
   }
   
-  void FileInfo::Export(std::string const& root, std::ifstream& s, bool pck) const
+  void SFTInfo::Export(std::string const& root, std::ifstream& s, bool pck) const
   {
     if (!DataSize)
     {
@@ -276,26 +295,6 @@ namespace DC
     return EXIT_SUCCESS;
   }
   
-  int PackSFT(std::string const& source, std::string const& destination)
-  {
-    auto contents = Utils::ContentsOfDir(source);
-    int size = static_cast<int>(contents.size());
-    std::ofstream s = std::ofstream(destination);
-    s.write(reinterpret_cast<char*>(&size), sizeof(size));
-    
-    uint32_t pos = size * DC::FileInfo::InfoSize() + static_cast<uint32_t>(sizeof(size));
-    for (int i = 0; i < size; ++i)
-    {
-      auto const& path = contents[i];
-      DC::FileInfo info;
-      info.Name = path.substr(source.size());
-      info.Offset = pos;
-      
-      pos += info.BlockSize;
-    }
-    return EXIT_SUCCESS;
-  }
-  
   int UnpackPCK(std::string const& src, std::string const& destination)
   {
     if (!Utils::CreateDir(destination))
@@ -310,7 +309,7 @@ namespace DC
       return EXIT_FAILURE;
     }
     s.seekg(0, std::ios::beg);
-    int result = DC::FileInfo::ExportPCK(s, destination);
+    int result = DC::SFTInfo::ExportPCK(s, destination);
     s.close();
     return result;
   }
@@ -328,29 +327,55 @@ namespace DC
       std::cout << "Failed to open " << src << std::endl;
       return EXIT_FAILURE;
     }
-    s.seekg(0, std::ios::beg);
-    unsigned int count = 0;
-    s.read((char*)&count, sizeof(count));
-    
-    std::vector<DC::FileInfo> contents;
-    for (unsigned int i = 0; i < count; ++i)
+    std::vector<DC::SFTInfo> contents;
+    if (!SFTInfo::ReadSFT(contents, s) || contents.empty())
     {
-      DC::FileInfo info(s);
-      if (!s.good())
-      {
-        std::cout << "Stream error!" << std::endl;
-        return EXIT_FAILURE;
-      }
-      contents.push_back(info);
+      return EXIT_FAILURE;
     }
-    std::cout << "Loaded " << contents.size() << " elements" << std::endl;
     
     std::string dst = Utils::EndsWith(destination, Utils::SEPARATOR) ? destination : destination + Utils::SEPARATOR;
-    for (DC::FileInfo const& info : contents)
+    for (DC::SFTInfo const& info : contents)
     {
       info.Export(dst, s, unpackPck);
     }
     std::cout << "Done!" << std::endl;
+    return EXIT_SUCCESS;
+  }
+  
+  int PatchSFT(std::string const& sft, std::string const& source, std::string const& name)
+  {
+    std::vector<SFTInfo> contents;
+    std::ifstream s(sft, std::ios::binary);
+    s.ignore(std::numeric_limits<std::streamsize>::max());
+    auto const end = s.gcount();
+    s.seekg(std::ios::beg);
+    if (!SFTInfo::ReadSFT(contents, s) || contents.empty())
+    {
+      return EXIT_FAILURE;
+    }
+    int idx = -1;
+    for (int i = 0; i < contents.size(); ++i)
+    {
+      auto const& info = contents[i];
+      if (Utils::EndsWith(info.Name, name))
+      {
+        if (idx == -1)
+        {
+          idx = i;
+        }
+        else
+        {
+          std::cout << name << " is not a unique name" << std::endl;
+          return EXIT_FAILURE;
+        }
+      }
+    }
+    if (idx == -1)
+    {
+      std::cout << name << " coud not be found" << std::endl;
+      return EXIT_FAILURE;
+    }
+    contents[idx].Offset = (uint32_t)end;
     return EXIT_SUCCESS;
   }
 }
