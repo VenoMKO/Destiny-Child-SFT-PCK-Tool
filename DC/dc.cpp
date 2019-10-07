@@ -10,6 +10,7 @@
 #include "aes256.h"
 #include "yappy.hpp"
 #include "utils.hpp"
+#include <algorithm>
 
 namespace
 {
