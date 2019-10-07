@@ -4,6 +4,8 @@
 //  Copyright © 2018 VenoMKO. All rights reserved.
 //
 #include <fstream>
+#include <vector>
+
 namespace DC
 {
   struct PCKInfo
